@@ -1,0 +1,2 @@
+# gologging
+logging for golang
