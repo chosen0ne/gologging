@@ -8,6 +8,9 @@ package gologging
 
 import (
     "errors"
+    "strings"
+    "path"
+    "os"
 )
 
 type HandlerType string
@@ -41,6 +44,7 @@ type LoggerConfig struct {
     MaxBytes            int64
     FileName            string
     EnableConsoleLog    bool
+    LogPath             string
 }
 
 func defaultValIfNonExist(config *LoggerConfig) {
@@ -74,24 +78,38 @@ func ConfigLogger(config *LoggerConfig) error {
 
     // Each Logger can only be initialize once
     if _, ok := loggerMgr.logCache[config.Name]; ok {
-        return nil
+        return errors.New("logger named '" + config.Name + "' already exists!")
     }
 
     if config.Handler != CONSOLE_HANDLER &&
-            config.Name == "" {
-        return errors.New("FileName required by TIME_ROTATE_HANDLER or SIZE_ROTATE_HANDLER")
+            config.FileName == "" {
+        config.FileName = config.Name
+    }
+
+    if !strings.HasSuffix(config.FileName, ".log") {
+        config.FileName += ".log"
+    }
+
+    if config.LogPath == "" {
+        config.LogPath = "."
+    }
+
+    var err error
+    fpath, err := getAbsPath(config.LogPath, config.FileName)
+    if err != nil {
+        return err
     }
 
     // Create Handler
     var handler Handler
-    var err error
     switch config.Handler {
     case CONSOLE_HANDLER:
         handler = defaultConsoleHandler()
+        config.EnableConsoleLog = false
     case TIME_ROTATE_HANDLER:
-        handler, err = NewTimeRotateFileHandler(config.FileName, config.Interval, config.BackupCount)
+        handler, err = NewTimeRotateFileHandler(fpath, config.Interval, config.BackupCount)
     case SIZE_ROTATE_HANDLER:
-        handler, err = NewSizeRotateFileHandler(config.FileName, config.MaxBytes, config.BackupCount)
+        handler, err = NewSizeRotateFileHandler(fpath, config.MaxBytes, config.BackupCount)
     }
 
     if err != nil {
@@ -102,17 +120,34 @@ func ConfigLogger(config *LoggerConfig) error {
     if config.Format == "" {
         config.Format = defautlFormatStr
     }
-    handler.SetFormatter(NewFormatter(config.Format))
+
+    formatter, err := NewFormatter(config.Format)
+    if err != nil {
+        return err
+    }
+    handler.SetFormatter(formatter)
 
     // Create Logger
     logger, ok := loggerMgr.logCache[config.Name]
     if !ok {
         logger = newLogger(config.Name, config.EnableConsoleLog)
-        logger.SetLevel(config.LevelVal)
         loggerMgr.logCache[config.Name] = logger
     }
+    logger.SetLevel(config.LevelVal)
     logger.AddHandler(handler)
 
     return nil
 }
 
+func getAbsPath(fpath, fname string) (string, error) {
+    if path.IsAbs(fpath) {
+        return path.Join(fpath, fname), nil
+    }
+
+    dir, err := os.Getwd();
+    if err != nil {
+        return "", err
+    }
+
+    return path.Join(dir, fname), nil
+}

@@ -11,8 +11,8 @@ import (
     "time"
     "io"
     "fmt"
-    "runtime"
     "strconv"
+    "path"
     "strings"
 )
 
@@ -20,6 +20,7 @@ const (
     _DATE             = "date"
     _TIME             = "time"
     _DATETIME         = "datetime"
+    _FUNCNAME         = "funcname"
     _FILENAME         = "filename"
     _FILEPATH         = "filepath"
     _LINENO           = "lineno"
@@ -31,6 +32,7 @@ const (
     _ATTR_RIGHT       = '}'
     _STR_PLACE_HOLDER = "%s"
     _NEWLINE          = '\n'
+    _FUNC_DEPTH       = 3
 )
 
 var (
@@ -41,54 +43,25 @@ var (
 type Formatter struct {
     formatStr       string
     valFunc         []interface{}
-    msgIdx          int
-    levelIdx        int
-    loggerNameIdx   int
 }
 
-
-func NewFormatter(formatStr string) *Formatter {
+func NewFormatter(formatStr string) (*Formatter, error) {
     valFuncs, fmtStr, err := parseFmtStr(formatStr)
     if err != nil {
-        fmt.Println("failed to parseFmtStr")
-        return nil
+        return nil, err
     }
 
-    msgIdx, levelIdx, loggerNameIdx := -1, -1, -1
-    // Find msg index
-    for idx, val := range valFuncs {
-        switch val {
-        case _MESSAGE:
-            msgIdx = idx
-        case _LEVELNAME:
-            levelIdx = idx
-        case _LOGGER_NAME:
-            loggerNameIdx = idx
-        }
-    }
+    formatter := &Formatter{fmtStr, valFuncs}
 
-    if msgIdx == -1 {
-        return nil
-    }
-
-    formatter := &Formatter{fmtStr, valFuncs, msgIdx, levelIdx, loggerNameIdx}
-
-    return formatter
+    return formatter, nil
 }
 
-func (format *Formatter) Format(loggerName string, level Level, message []byte) []byte {
+//func (format *Formatter) Format(loggerName string, level Level, message []byte) []byte {
+func (format *Formatter) Format(msg *_Msg) []byte {
     attrs := make([]interface{}, 0)
-    for idx, attrFunc := range format.valFunc {
-        if idx == format.msgIdx {
-            attrs = append(attrs, string(message))
-        } else if idx == format.levelIdx {
-            attrs = append(attrs, level.Name())
-        } else if idx == format.loggerNameIdx {
-            attrs = append(attrs, loggerName)
-        } else {
-            fn := attrFunc.(func () string)
-            attrs = append(attrs, fn())
-        }
+    for _, attrFunc := range format.valFunc {
+        fn := attrFunc.(func (*_Msg) string)
+        attrs = append(attrs, fn(msg))
     }
 
     outputBuf := bytes.Buffer{}
@@ -166,38 +139,48 @@ func parseFmtStr(fmtStr string) ([]interface{}, string, error) {
     return valFuncs, string(fmtBuf.Bytes()), nil
 }
 
-func getDate() string {
+func getDate(_ *_Msg) string {
     return time.Now().Format("2006-01-02")
 }
 
-func getTime() string {
+func getTime(_ *_Msg) string {
     return time.Now().Format("15:04:05")
 }
 
-func getDateTime() string {
+func getDateTime(_ *_Msg) string {
     return time.Now().Format("2006-01-02 15:04:05")
 }
 
-func getFilePath() string {
-    _, file, _, ok := runtime.Caller(1)
-    if !ok {
-        file = "unkown"
-    }
-    return file
+func getFilePath(msg *_Msg) string {
+    return msg.fileName
 }
 
-func getFileName() string {
-    path := getFilePath()
-    parts := strings.Split(path, "/")
+func getFileName(msg *_Msg) string {
+    return path.Base(msg.fileName)
+}
+
+func getLineNo(msg *_Msg) string {
+    return strconv.Itoa(msg.lineNo)
+}
+
+func getFuncName(msg *_Msg) string {
+    parts := strings.Split(msg.funcName, "/")
+    if len(parts) <= 0 {
+        return ""
+    }
     return parts[len(parts) - 1]
 }
 
-func getLineNo() string {
-    _, _, line, ok := runtime.Caller(1)
-    if !ok {
-        line = -1
-    }
-    return strconv.Itoa(line)
+func getMessage(msg *_Msg) string {
+    return string(msg.message)
+}
+
+func getLevelName(msg *_Msg) string {
+    return msg.level.Name()
+}
+
+func getLoggerName(msg *_Msg) string {
+    return msg.loggerName
 }
 
 func init() {
@@ -207,12 +190,13 @@ func init() {
     attrs[_DATETIME] = getDateTime
     attrs[_FILENAME] = getFileName
     attrs[_FILEPATH] = getFilePath
+    attrs[_FUNCNAME] = getFuncName
     attrs[_LINENO] = getLineNo
-    attrs[_MESSAGE] = _MESSAGE
-    attrs[_LEVELNAME] = _LEVELNAME
-    attrs[_LOGGER_NAME] = _LOGGER_NAME
+    attrs[_MESSAGE] = getMessage
+    attrs[_LEVELNAME] = getLevelName
+    attrs[_LOGGER_NAME] = getLoggerName
 
-    defautlFormatStr = "${datetime} ${filename}:${lineno}-[${levelname}]-${name}-${message}"
+    defautlFormatStr = "${datetime} ${filename}:${lineno}:${funcname}-[${levelname}]-${name}-${message}"
 }
 
 

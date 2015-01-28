@@ -11,6 +11,7 @@ import (
     "bytes"
     "fmt"
     "errors"
+    "os"
 )
 
 const (
@@ -64,7 +65,7 @@ func newLogger(name string, enableConsoleLog bool) *Logger {
     return logger
 }
 
-func (logger *Logger) Log(level Level, fmtStr string, vals ...interface{}) {
+func (logger *Logger) log(level Level, fmtStr string, vals ...interface{}) {
     if !checkLevel(level) {
         panic(errors.New("not support level"))
     }
@@ -78,7 +79,7 @@ func (logger *Logger) Log(level Level, fmtStr string, vals ...interface{}) {
     fmt.Fprintf(&msg, fmtStr, vals...)
 
     for _, handler := range logger.handlers {
-        handler.Emit(&_Msg{logger.name, level, msg.Bytes()})
+        handler.Emit(&_Msg{loggerName: logger.name, level: level, message: msg.Bytes()})
     }
 }
 
@@ -97,23 +98,29 @@ func (logger *Logger) AddHandler(handler Handler) {
 }
 
 func (logger *Logger) Debug(fmt string, vals ...interface{}) {
-    logger.Log(DEBUG, fmt, vals...)
+    logger.log(DEBUG, fmt, vals...)
 }
 
 func (logger *Logger) Info(fmt string, vals ...interface{}) {
-    logger.Log(INFO, fmt, vals...)
+    logger.log(INFO, fmt, vals...)
 }
 
 func (logger *Logger) Warn(fmt string, vals ...interface{}) {
-    logger.Log(WARN, fmt, vals...)
+    logger.log(WARN, fmt, vals...)
 }
 
 func (logger *Logger) Error(fmt string, vals ...interface{}) {
-    logger.Log(ERROR, fmt, vals...)
+    logger.log(ERROR, fmt, vals...)
+}
+
+func (logger *Logger) Exception(err error, fmt string, vals ...interface{}) {
+    fmt = fmt + ", err: " + err.Error()
+    logger.log(ERROR, fmt, vals...)
 }
 
 func (logger *Logger) Fatal(fmt string, vals ...interface{}) {
-    logger.Log(FATAL, fmt, vals...)
+    logger.log(FATAL, fmt, vals...)
+    os.Exit(1)
 }
 
 func checkLevel(level Level) bool {
@@ -158,6 +165,10 @@ func Error(fmt string, vals ...interface{}) {
     loggerMgr.rootLogger.Error(fmt, vals...)
 }
 
+func Exception(err error, fmt string, vals ...interface{}) {
+    loggerMgr.rootLogger.Exception(err, fmt, vals...)
+}
+
 func Fatal(fmt string, vals ...interface{}) {
     loggerMgr.rootLogger.Fatal(fmt, vals...)
 }
@@ -168,8 +179,10 @@ func GetLogger(name string) *Logger {
 
 func ConfigSizeRotateLogger(
         name string,
+        level Level,
         maxBytes int64,
-        backupCount uint16) error {
+        backupCount uint16,
+        enableConsoleLog bool) error {
     if _, ok := loggerMgr.logCache[name]; ok {
         return errors.New("logger named '" + name + "' already exists!")
     }
@@ -180,14 +193,21 @@ func ConfigSizeRotateLogger(
         return err
     }
     logger.AddHandler(handler)
+    logger.SetLevel(level)
+
+    if enableConsoleLog {
+        logger.AddHandler(defaultConsoleHandler())
+    }
 
     return nil
 }
 
 func ConfigTimeRotateLogger(
         name string,
+        level Level,
         interval RotateInterval,
-        backupCount uint16) error {
+        backupCount uint16,
+        enableConsoleLog bool) error {
     if _, ok := loggerMgr.logCache[name]; ok {
         return errors.New("logger named '" + name + "' already exists!")
     }
@@ -197,6 +217,11 @@ func ConfigTimeRotateLogger(
         return err
     }
     logger.AddHandler(hander)
+    logger.SetLevel(level)
+
+    if enableConsoleLog {
+        logger.AddHandler(defaultConsoleHandler())
+    }
 
     return nil
 }

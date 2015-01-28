@@ -16,22 +16,33 @@ import (
     "errors"
     "bytes"
     "fmt"
+    "runtime"
+)
+
+var (
+    innerFuncNames  map[string]int
 )
 
 const (
     _OPEN_FILE_FLAG = os.O_WRONLY | os.O_CREATE | os.O_APPEND
     _OPEN_FILE_MODE = os.ModePerm & 0644
     _SUFFIX_SEP     = "_"
+    _CALLER_SKIP    = 3
+    _CALLER_SIZE    = 10
 )
 
 type _Msg struct {
     loggerName  string
     level       Level
     message     []byte
+    funcName    string
+    fileName    string
+    lineNo      int
 }
 
 type Handler interface {
-    Handle(loggerName string, level Level, message []byte) error
+    //Handle(loggerName string, level Level, message []byte) error
+    Handle(msg *_Msg) error
     SetFormatter(formatter *Formatter)
     SetLevel(level Level)
 }
@@ -50,15 +61,39 @@ func (loop *HandlerLoop) HandleLoop() {
     for {
         msg := <-loop.q
 
-        if err := loop.handler.Handle(msg.loggerName, msg.level, msg.message);
-                err != nil {
+        if err := loop.handler.Handle(msg); err != nil {
             stdErrLog("failed to handle", err)
         }
     }
 }
 
 func (loop *HandlerLoop) Emit(msg *_Msg) {
+    stacks := make([]uintptr, _CALLER_SIZE)
+    n := runtime.Callers(_CALLER_SKIP, stacks)
+
+    // Find the first function which is not owned by gologging
+    for i := 0; i < n; i++ {
+        fn := runtime.FuncForPC(stacks[i])
+        funcName := fn.Name()
+        if loop.isExternalFunc(funcName) {
+            fileName, lineNo := fn.FileLine(stacks[i])
+            msg.fileName, msg.lineNo, msg.funcName = fileName, lineNo, funcName
+            break
+        }
+    }
+
     loop.q <- msg
+}
+
+func (loop *HandlerLoop) isExternalFunc(funcName string) bool {
+    parts := strings.Split(funcName, "/")
+    if len(parts) <= 0 {
+        return false
+    }
+
+    _, ok := innerFuncNames[parts[len(parts) - 1]]
+
+    return !ok
 }
 
 
@@ -83,19 +118,16 @@ func (handler *StreamHandler) SetLevel(level Level) {
     handler.level = level
 }
 
-func (handler *StreamHandler) Handle(
-        loggerName string,
-        level Level,
-        message []byte) error {
-    if level < handler.level {
+func (handler *StreamHandler) Handle(msg *_Msg) error {
+    if msg.level < handler.level {
         return nil
     }
 
     if handler.formatter == nil {
-        handler.formatter = NewFormatter(defautlFormatStr)
+        handler.formatter, _ = NewFormatter(defautlFormatStr)
     }
 
-    logMsg := handler.formatter.Format(loggerName, level, message)
+    logMsg := handler.formatter.Format(msg)
     handler.output.Write(logMsg)
 
     return nil
@@ -126,11 +158,8 @@ func NewFileHandler(fileName string) (*FileHandler, error) {
     return handler, nil
 }
 
-func (handler *FileHandler) Handle(
-        loggerName string,
-        level Level,
-        message []byte) error {
-    if err := handler.StreamHandler.Handle(loggerName, level, message); err != nil {
+func (handler *FileHandler) Handle(msg *_Msg) error {
+    if err := handler.StreamHandler.Handle(msg); err != nil {
         return err
     }
 
@@ -179,10 +208,7 @@ func NewTimeRotateFileHandler(
     return rotateHandler, nil
 }
 
-func (handler *TimeRotateFileHandler) Handle(
-        loggerName string,
-        level Level,
-        message []byte) error {
+func (handler *TimeRotateFileHandler) Handle(msg *_Msg) error {
     // Rotate file
     if handler.shouldRotate() {
         if err := handler.doRotate(); err != nil {
@@ -190,7 +216,7 @@ func (handler *TimeRotateFileHandler) Handle(
         }
     }
 
-    return handler.FileHandler.Handle(loggerName, level, message)
+    return handler.FileHandler.Handle(msg)
 }
 
 func (handler *TimeRotateFileHandler) shouldRotate() bool {
@@ -290,19 +316,16 @@ func NewSizeRotateFileHandler(
     return rotateHandler, nil
 }
 
-func (handler *SizeRotateFileHandler) Handle(
-        loggerName string,
-        level Level,
-        message []byte) error {
-    if level < handler.level {
+func (handler *SizeRotateFileHandler) Handle(msg *_Msg) error {
+    if msg.level < handler.level {
         return nil
     }
 
     if handler.formatter == nil {
-        handler.formatter = NewFormatter(defautlFormatStr)
+        handler.formatter, _ = NewFormatter(defautlFormatStr)
     }
 
-    logMsg := handler.formatter.Format(loggerName, level, message)
+    logMsg := handler.formatter.Format(msg)
     handler.curBytes += int64(len(logMsg))
     // Need to rotate
     if handler.curBytes > handler.maxBytes {
@@ -412,7 +435,8 @@ func findMaxSuffix(fileName string) (int32, error) {
 
 func defaultConsoleHandler() Handler {
     handler := NewStreamHandle(os.Stdout)
-    handler.SetFormatter(NewFormatter(defautlFormatStr))
+    formater, _ := NewFormatter(defautlFormatStr)
+    handler.SetFormatter(formater)
     return handler
 }
 
@@ -423,3 +447,13 @@ func stdErrLog(msg string, err error) {
     os.Stderr.WriteString(string(buff.Bytes()))
 }
 
+func init() {
+    innerFuncNames = make(map[string]int)
+    loggerPrefix := "gologging.(*Logger)."
+    gologgingPrefix := "gologging."
+
+    for _, lv := range []string {"Debug", "Info", "Error", "Exception", "Fatal"} {
+        innerFuncNames[loggerPrefix + lv] = 1
+        innerFuncNames[gologgingPrefix + lv] = 1
+    }
+}
