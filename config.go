@@ -149,5 +149,5 @@ func getAbsPath(fpath, fname string) (string, error) {
         return "", err
     }
 
-    return path.Join(dir, fname), nil
+    return path.Join(path.Join(dir, fpath), fname), nil
 }
