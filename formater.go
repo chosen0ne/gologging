@@ -198,5 +198,3 @@ func init() {
 
     defautlFormatStr = "${datetime} [${levelname}]-${filename}:${lineno}:${funcname}-${name}-${message}"
 }
-
-
