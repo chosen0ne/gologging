@@ -43,7 +43,6 @@ logging for golang
 
 ####3) 通过配置对象初始化
     config := LoggerConfig{
-        Name: "log-name",
         LevelVal: INFO,
         Format: "${datetime}-${levelname}-${message}",
         Handler: TIME_ROTATE_HANDLER,
@@ -52,6 +51,6 @@ logging for golang
         EnableConsoleLog: true,
         LogPath: "/home/logs/"
     }
-    ConfigLogger(&config)
+    ConfigLogger("log-name", &config)
     logger := GetLogger("log-name")
 

@@ -35,7 +35,6 @@ func validHandlerType(ht HandlerType) bool {
 }
 
 type LoggerConfig struct {
-    Name                string
     LevelVal            Level
     Format              string
     Handler             HandlerType
@@ -62,13 +61,9 @@ func defaultValIfNonExist(config *LoggerConfig) {
     }
 }
 
-func ConfigLogger(config *LoggerConfig) error {
+func ConfigLogger(name string, config *LoggerConfig) error {
     if !validHandlerType(config.Handler) {
         return errors.New("not support handler: " + string(config.Handler))
-    }
-
-    if config.Name == "" {
-        return errors.New("logger Name required")
     }
 
     defaultValIfNonExist(config)
@@ -77,13 +72,13 @@ func ConfigLogger(config *LoggerConfig) error {
     defer loggerMgr.mu.Unlock()
 
     // Each Logger can only be initialize once
-    if _, ok := loggerMgr.logCache[config.Name]; ok {
-        return errors.New("logger named '" + config.Name + "' already exists!")
+    if _, ok := loggerMgr.logCache[name]; ok {
+        return errors.New("logger named '" + name + "' already exists!")
     }
 
     if config.Handler != CONSOLE_HANDLER &&
             config.FileName == "" {
-        config.FileName = config.Name
+        config.FileName = name
     }
 
     if !strings.HasSuffix(config.FileName, ".log") {
@@ -128,10 +123,10 @@ func ConfigLogger(config *LoggerConfig) error {
     handler.SetFormatter(formatter)
 
     // Create Logger
-    logger, ok := loggerMgr.logCache[config.Name]
+    logger, ok := loggerMgr.logCache[name]
     if !ok {
-        logger = newLogger(config.Name, config.EnableConsoleLog)
-        loggerMgr.logCache[config.Name] = logger
+        logger = newLogger(name, config.EnableConsoleLog)
+        loggerMgr.logCache[name] = logger
     }
     logger.SetLevel(config.LevelVal)
     logger.AddHandler(handler)
