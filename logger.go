@@ -7,227 +7,228 @@
 package gologging
 
 import (
-    "sync"
-    "bytes"
-    "fmt"
-    "errors"
-    "os"
+	"bytes"
+	"errors"
+	"fmt"
+	"os"
+	"sync"
 )
 
 const (
-    DEBUG = iota
-    INFO
-    WARN
-    ERROR
-    FATAL
-    _MAX_LEVEL
-    _DEFAULT_CHAN_SIZE = 100
+	DEBUG = iota
+	INFO
+	WARN
+	ERROR
+	FATAL
+	_MAX_LEVEL
+	_DEFAULT_CHAN_SIZE = 100
 )
 
 var (
-    loggerMgr   *_LogMgr        // use to manage all the loggers
+	loggerMgr *_LogMgr // use to manage all the loggers
 )
 
-var lvNames = []string {
-    "DEBUG",
-    "INFO",
-    "WARN",
-    "ERROR",
-    "FATAL",
+var lvNames = []string{
+	"DEBUG",
+	"INFO",
+	"WARN",
+	"ERROR",
+	"FATAL",
 }
 
 type Level int8
 
 func (level Level) Name() string {
-    if checkLevel(level) {
-        return lvNames[level]
-    }
+	if checkLevel(level) {
+		return lvNames[level]
+	}
 
-    return "UNKOWN_LEVEL"
+	return "UNKOWN_LEVEL"
 }
 
 type Logger struct {
-    level       Level
-    name        string
-    handlers    []*HandlerLoop
-    mu          sync.Mutex
+	level    Level
+	name     string
+	handlers []*HandlerLoop
+	mu       sync.Mutex
 }
 
 func newLogger(name string, enableConsoleLog bool) *Logger {
-    // Default console log handler
-    handlers := make([]*HandlerLoop, 0)
-    logger := &Logger{level: INFO, name: name, handlers: handlers}
-    if enableConsoleLog {
-        logger.AddHandler(defaultConsoleHandler())
-    }
+	// Default console log handler
+	handlers := make([]*HandlerLoop, 0)
+	logger := &Logger{level: INFO, name: name, handlers: handlers}
+	if enableConsoleLog {
+		logger.AddHandler(defaultConsoleHandler())
+	}
 
-    // Default log level is INFO
-    return logger
+	// Default log level is INFO
+	return logger
 }
 
 func (logger *Logger) log(level Level, fmtStr string, vals ...interface{}) {
-    if !checkLevel(level) {
-        panic(errors.New("not support level"))
-    }
+	if !checkLevel(level) {
+		panic(errors.New("not support level"))
+	}
 
-    if level < logger.level {
-        return
-    }
+	if level < logger.level {
+		return
+	}
 
-    // Fill message
-    msg := bytes.Buffer{}
-    fmt.Fprintf(&msg, fmtStr, vals...)
+	// Fill message
+	msg := bytes.Buffer{}
+	fmt.Fprintf(&msg, fmtStr, vals...)
 
-    for _, handler := range logger.handlers {
-        handler.Emit(&_Msg{loggerName: logger.name, level: level, message: msg.Bytes()})
-    }
+	for _, handler := range logger.handlers {
+		handler.Emit(&_Msg{loggerName: logger.name, level: level, message: msg.Bytes()})
+	}
 }
 
 func (logger *Logger) SetLevel(level Level) {
-    if !checkLevel(level) {
-        panic(errors.New("not support level"))
-    }
+	if !checkLevel(level) {
+		panic(errors.New("not support level"))
+	}
 
-    logger.level = level
+	logger.level = level
 }
 
 func (logger *Logger) AddHandler(handler Handler) {
-    loop := NewLoop(_DEFAULT_CHAN_SIZE, handler)
-    logger.handlers = append(logger.handlers, loop)
-    go loop.HandleLoop()
+	loop := NewLoop(_DEFAULT_CHAN_SIZE, handler)
+	logger.handlers = append(logger.handlers, loop)
+	go loop.HandleLoop()
 }
 
 func (logger *Logger) Debug(fmt string, vals ...interface{}) {
-    logger.log(DEBUG, fmt, vals...)
+	logger.log(DEBUG, fmt, vals...)
 }
 
 func (logger *Logger) Info(fmt string, vals ...interface{}) {
-    logger.log(INFO, fmt, vals...)
+	logger.log(INFO, fmt, vals...)
 }
 
 func (logger *Logger) Warn(fmt string, vals ...interface{}) {
-    logger.log(WARN, fmt, vals...)
+	logger.log(WARN, fmt, vals...)
 }
 
 func (logger *Logger) Error(fmt string, vals ...interface{}) {
-    logger.log(ERROR, fmt, vals...)
+	logger.log(ERROR, fmt, vals...)
 }
 
 func (logger *Logger) Exception(err error, fmt string, vals ...interface{}) {
-    fmt = fmt + ", err: " + err.Error()
-    logger.log(ERROR, fmt, vals...)
+	fmt = fmt + ", err: " + err.Error()
+	logger.log(ERROR, fmt, vals...)
 }
 
 func (logger *Logger) Fatal(fmt string, vals ...interface{}) {
-    logger.log(FATAL, fmt, vals...)
-    os.Exit(1)
+	logger.log(FATAL, fmt, vals...)
+	os.Exit(1)
 }
 
 func checkLevel(level Level) bool {
-    return level >= DEBUG && level < _MAX_LEVEL
+	return level >= DEBUG && level < _MAX_LEVEL
 }
 
 // ------- Private class ------- //
 type _LogMgr struct {
-    logCache    map[string]*Logger
-    mu          sync.Mutex
-    rootLogger  *Logger
+	logCache   map[string]*Logger
+	mu         sync.Mutex
+	rootLogger *Logger
 }
 
 func (mgr *_LogMgr) GetLogger(name string) *Logger {
-    mgr.mu.Lock()
-    defer mgr.mu.Unlock()
+	mgr.mu.Lock()
+	defer mgr.mu.Unlock()
 
-    logger, ok := mgr.logCache[name]
-    if !ok {
-        logger = newLogger(name, true)
-        mgr.logCache[name] = logger
-    }
+	logger, ok := mgr.logCache[name]
+	if !ok {
+		logger = newLogger(name, true)
+		mgr.logCache[name] = logger
+	}
 
-    return logger
+	return logger
 }
 
 // ------- Log method for root logger ------- //
 // root logger emit log to std out
 func Debug(fmt string, vals ...interface{}) {
-    loggerMgr.rootLogger.Debug(fmt, vals...)
+	loggerMgr.rootLogger.Debug(fmt, vals...)
 }
 
 func Info(fmt string, vals ...interface{}) {
-    loggerMgr.rootLogger.Info(fmt, vals...)
+	loggerMgr.rootLogger.Info(fmt, vals...)
 }
 
 func Warn(fmt string, vals ...interface{}) {
-    loggerMgr.rootLogger.Warn(fmt, vals...)
+	loggerMgr.rootLogger.Warn(fmt, vals...)
 }
 
 func Error(fmt string, vals ...interface{}) {
-    loggerMgr.rootLogger.Error(fmt, vals...)
+	loggerMgr.rootLogger.Error(fmt, vals...)
 }
 
 func Exception(err error, fmt string, vals ...interface{}) {
-    loggerMgr.rootLogger.Exception(err, fmt, vals...)
+	loggerMgr.rootLogger.Exception(err, fmt, vals...)
 }
 
 func Fatal(fmt string, vals ...interface{}) {
-    loggerMgr.rootLogger.Fatal(fmt, vals...)
+	loggerMgr.rootLogger.Fatal(fmt, vals...)
 }
 
 func GetLogger(name string) *Logger {
-    return loggerMgr.GetLogger(name)
+	return loggerMgr.GetLogger(name)
 }
 
 func ConfigSizeRotateLogger(
-        name string,
-        level Level,
-        maxBytes int64,
-        backupCount uint16,
-        enableConsoleLog bool) error {
-    if _, ok := loggerMgr.logCache[name]; ok {
-        return errors.New("logger named '" + name + "' already exists!")
-    }
+	name string,
+	level Level,
+	maxBytes int64,
+	backupCount uint16,
+	enableConsoleLog bool) error {
+	if _, ok := loggerMgr.logCache[name]; ok {
+		return errors.New("logger named '" + name + "' already exists!")
+	}
 
-    logger := loggerMgr.GetLogger(name)
-    handler, err := NewSizeRotateFileHandler(name + ".log", maxBytes, backupCount)
-    if err != nil {
-        return err
-    }
-    logger.AddHandler(handler)
-    logger.SetLevel(level)
+	logger := loggerMgr.GetLogger(name)
+	handler, err := NewSizeRotateFileHandler(name+".log", maxBytes, backupCount)
+	if err != nil {
+		return err
+	}
+	logger.AddHandler(handler)
+	logger.SetLevel(level)
 
-    if enableConsoleLog {
-        logger.AddHandler(defaultConsoleHandler())
-    }
+	if enableConsoleLog {
+		logger.AddHandler(defaultConsoleHandler())
+	}
 
-    return nil
+	return nil
 }
 
 func ConfigTimeRotateLogger(
-        name string,
-        level Level,
-        interval RotateInterval,
-        backupCount uint16,
-        enableConsoleLog bool) error {
-    if _, ok := loggerMgr.logCache[name]; ok {
-        return errors.New("logger named '" + name + "' already exists!")
-    }
-    logger := loggerMgr.GetLogger(name)
-    hander, err := NewTimeRotateFileHandler(name + ".log", interval, backupCount)
-    if err != nil {
-        return err
-    }
-    logger.AddHandler(hander)
-    logger.SetLevel(level)
+	name string,
+	level Level,
+	interval RotateInterval,
+	backupCount uint16,
+	enableConsoleLog bool) error {
+	if _, ok := loggerMgr.logCache[name]; ok {
+		//return errors.New("logger named '" + name + "' already exists!")
+	}
+	logger := loggerMgr.GetLogger(name)
 
-    if enableConsoleLog {
-        logger.AddHandler(defaultConsoleHandler())
-    }
+	hander, err := NewTimeRotateFileHandler(name+".log", interval, backupCount)
+	if err != nil {
+		return err
+	}
+	logger.AddHandler(hander)
+	logger.SetLevel(level)
 
-    return nil
+	if enableConsoleLog {
+		logger.AddHandler(defaultConsoleHandler())
+	}
+
+	return nil
 }
 
 func init() {
-    loggerMgr = &_LogMgr{}
-    loggerMgr.logCache = make(map[string]*Logger)
-    loggerMgr.rootLogger = newLogger("root", true)
+	loggerMgr = &_LogMgr{}
+	loggerMgr.logCache = make(map[string]*Logger)
+	loggerMgr.rootLogger = newLogger("root", true)
 }
