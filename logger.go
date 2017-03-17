@@ -47,21 +47,22 @@ func (level Level) Name() string {
 }
 
 type Logger struct {
-	level    Level
-	name     string
+	level Level
+	name  string
+	// Handlers will decide how to process the log message.
+	// And a logger can be configure with multiple handlers.
 	handlers []*HandlerLoop
 	mu       sync.Mutex
 }
 
 func newLogger(name string, enableConsoleLog bool) *Logger {
-	// Default console log handler
 	handlers := make([]*HandlerLoop, 0)
+	// Default logger level is INFO
 	logger := &Logger{level: INFO, name: name, handlers: handlers}
 	if enableConsoleLog {
 		logger.AddHandler(defaultConsoleHandler())
 	}
 
-	// Default log level is INFO
 	return logger
 }
 
@@ -78,6 +79,7 @@ func (logger *Logger) log(level Level, fmtStr string, vals ...interface{}) {
 	msg := bytes.Buffer{}
 	fmt.Fprintf(&msg, fmtStr, vals...)
 
+	// Emit the message to all the handlers
 	for _, handler := range logger.handlers {
 		handler.Emit(&_Msg{loggerName: logger.name, level: level, message: msg.Bytes()})
 	}
@@ -127,28 +129,31 @@ func checkLevel(level Level) bool {
 	return level >= DEBUG && level < _MAX_LEVEL
 }
 
-// ------- Private class ------- //
 type _LogMgr struct {
-	logCache   map[string]*Logger
-	mu         sync.Mutex
+	logCache   map[string]*Logger // name => Logger
+	mu         sync.Mutex         // Synchronize logCache map.
 	rootLogger *Logger
 }
 
 func (mgr *_LogMgr) GetLogger(name string) *Logger {
+	return mgr.getLogger(name, true)
+}
+
+func (mgr *_LogMgr) getLogger(name string, enableConsoleLog bool) *Logger {
 	mgr.mu.Lock()
 	defer mgr.mu.Unlock()
 
 	logger, ok := mgr.logCache[name]
 	if !ok {
-		logger = newLogger(name, true)
+		logger = newLogger(name, enableConsoleLog)
 		mgr.logCache[name] = logger
 	}
 
 	return logger
 }
 
-// ------- Log method for root logger ------- //
-// root logger emit log to std out
+// Methods for root logger, all the message emit by root logger
+// wil be output to stdout
 func Debug(fmt string, vals ...interface{}) {
 	loggerMgr.rootLogger.Debug(fmt, vals...)
 }
@@ -177,17 +182,15 @@ func GetLogger(name string) *Logger {
 	return loggerMgr.GetLogger(name)
 }
 
+// ConfigSizeRotateLogger configure a size rotated logger
 func ConfigSizeRotateLogger(
 	name string,
 	level Level,
 	maxBytes int64,
 	backupCount uint16,
 	enableConsoleLog bool) error {
-	if _, ok := loggerMgr.logCache[name]; ok {
-		return errors.New("logger named '" + name + "' already exists!")
-	}
 
-	logger := loggerMgr.GetLogger(name)
+	logger := loggerMgr.getLogger(name, false)
 	handler, err := NewSizeRotateFileHandler(name+".log", maxBytes, backupCount)
 	if err != nil {
 		return err
@@ -202,17 +205,15 @@ func ConfigSizeRotateLogger(
 	return nil
 }
 
+// ConfigTimeRotateLogger configures a size rotated logger
 func ConfigTimeRotateLogger(
 	name string,
 	level Level,
 	interval RotateInterval,
 	backupCount uint16,
 	enableConsoleLog bool) error {
-	if _, ok := loggerMgr.logCache[name]; ok {
-		//return errors.New("logger named '" + name + "' already exists!")
-	}
-	logger := loggerMgr.GetLogger(name)
 
+	logger := loggerMgr.getLogger(name, false)
 	hander, err := NewTimeRotateFileHandler(name+".log", interval, backupCount)
 	if err != nil {
 		return err

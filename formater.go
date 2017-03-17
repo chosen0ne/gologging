@@ -196,5 +196,5 @@ func init() {
 	attrs[_LEVELNAME] = getLevelName
 	attrs[_LOGGER_NAME] = getLoggerName
 
-	defautlFormatStr = "${datetime} [${levelname}]-${filename}:${lineno}:${funcname}-${name}-${message}"
+	defautlFormatStr = "${datetime} [${name}] ${filename}:${lineno}:${funcname} [${levelname}] ${message}"
 }
