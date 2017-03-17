@@ -56,7 +56,6 @@ func NewFormatter(formatStr string) (*Formatter, error) {
 	return formatter, nil
 }
 
-//func (format *Formatter) Format(loggerName string, level Level, message []byte) []byte {
 func (format *Formatter) Format(msg *_Msg) []byte {
 	attrs := make([]interface{}, 0)
 	for _, attrFunc := range format.valFunc {

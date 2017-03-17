@@ -41,7 +41,6 @@ type _Msg struct {
 }
 
 type Handler interface {
-	//Handle(loggerName string, level Level, message []byte) error
 	Handle(msg *_Msg) error
 	SetFormatter(formatter *Formatter)
 	SetLevel(level Level)
@@ -96,7 +95,6 @@ func (loop *HandlerLoop) isExternalFunc(funcName string) bool {
 	return !ok
 }
 
-// ------- StreamHandler ------- //
 type StreamHandler struct {
 	output    io.Writer
 	formatter *Formatter
@@ -136,7 +134,6 @@ func (handler *StreamHandler) SetOutput(out io.Writer) {
 	handler.output = out
 }
 
-// ------- FileHandler ------- //
 type FileHandler struct {
 	StreamHandler
 	fileName string
@@ -179,7 +176,6 @@ const (
 	HALF_HOUR RotateInterval = 1800
 )
 
-// ------- TimeRotateFileHandler ------- //
 type TimeRotateFileHandler struct {
 	FileHandler
 	interval    RotateInterval
@@ -191,6 +187,7 @@ func NewTimeRotateFileHandler(
 	fileName string,
 	interval RotateInterval,
 	backupCount uint16) (*TimeRotateFileHandler, error) {
+
 	fileHandler, err := NewFileHandler(fileName)
 	if err != nil {
 		return nil, err
@@ -272,7 +269,6 @@ const (
 	GB int64 = 1 << (10 * iota)
 )
 
-// ------- SizeRotateFileHandler ------- //
 type SizeRotateFileHandler struct {
 	FileHandler
 	maxBytes    int64
