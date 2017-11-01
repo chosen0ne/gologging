@@ -54,7 +54,6 @@ type Logger struct {
 	//
 	// TODO: support sync mode to handle message
 	handlers []*HandlerLoop
-	mu       sync.Mutex
 }
 
 func newLogger(name string, enableConsoleLog bool) *Logger {
