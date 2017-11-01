@@ -215,11 +215,11 @@ func ConfigTimeRotateLogger(
 	enableConsoleLog bool) error {
 
 	logger := loggerMgr.getLogger(name, false)
-	hander, err := NewTimeRotateFileHandler(name+".log", interval, backupCount)
+	handler, err := NewTimeRotateFileHandler(name+".log", interval, backupCount)
 	if err != nil {
 		return err
 	}
-	logger.AddHandler(hander)
+	logger.AddHandler(handler)
 	logger.SetLevel(level)
 
 	if enableConsoleLog {

@@ -45,6 +45,8 @@ type Handler interface {
 	Handle(msg *_Msg) error
 	SetFormatter(formatter *Formatter)
 	SetLevel(level Level)
+	SetSyncMode(sync bool)
+	IsSync() bool // wheather or not to synchronize log 'Emit' and 'Handle'
 }
 
 // As some handlers need to do some high-cost things when
@@ -54,11 +56,12 @@ type Handler interface {
 type HandlerLoop struct {
 	q       chan *_Msg
 	handler Handler
+	w       chan byte // used to make sure 'Emit' and 'Handle' are synchronous.
 }
 
 func NewLoop(size int, handler Handler) *HandlerLoop {
 	q := make(chan *_Msg, size)
-	return &HandlerLoop{q, handler}
+	return &HandlerLoop{q, handler, make(chan byte)}
 }
 
 func (loop *HandlerLoop) HandleLoop() {
@@ -67,6 +70,11 @@ func (loop *HandlerLoop) HandleLoop() {
 
 		if err := loop.handler.Handle(msg); err != nil {
 			stdErrLog("failed to handle", err)
+		}
+
+		if loop.handler.IsSync() {
+			// notify the goroutine which invoked 'Emit'
+			loop.w <- '0'
 		}
 	}
 }
@@ -87,6 +95,11 @@ func (loop *HandlerLoop) Emit(msg *_Msg) {
 	}
 
 	loop.q <- msg
+
+	if loop.handler.IsSync() {
+		// wait for finish of handle
+		<-loop.w
+	}
 }
 
 func (loop *HandlerLoop) isExternalFunc(funcName string) bool {
@@ -105,10 +118,11 @@ type StreamHandler struct {
 	output    io.Writer
 	formatter *Formatter
 	level     Level
+	isSync    bool
 }
 
 func NewStreamHandle(out io.Writer) *StreamHandler {
-	handler := StreamHandler{out, nil, INFO}
+	handler := StreamHandler{out, nil, INFO, false}
 
 	return &handler
 }
@@ -134,6 +148,14 @@ func (handler *StreamHandler) Handle(msg *_Msg) error {
 	handler.output.Write(logMsg)
 
 	return nil
+}
+
+func (handler *StreamHandler) SetSyncMode(sync bool) {
+	handler.isSync = sync
+}
+
+func (handler *StreamHandler) IsSync() bool {
+	return handler.isSync
 }
 
 func (handler *StreamHandler) SetOutput(out io.Writer) {
@@ -446,6 +468,7 @@ func findMaxSuffix(fileName string) (int32, error) {
 
 func defaultConsoleHandler() Handler {
 	handler := NewStreamHandle(os.Stdout)
+	handler.SetSyncMode(true)
 	formater, _ := NewFormatter(defautlFormatStr)
 	handler.SetFormatter(formater)
 	return handler

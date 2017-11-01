@@ -46,6 +46,7 @@ func builder(handlerType HandlerType) *loggerBuilder {
 		true,
 		"./",
 		false,
+		false,
 	}
 
 	return &loggerBuilder{conf, false}
@@ -97,8 +98,13 @@ func (b *loggerBuilder) LogPath(path string) *loggerBuilder {
 	return b
 }
 
-func (b *loggerBuilder) SyncWrite(sync bool) *loggerBuilder {
-	b.config.SyncWrite = sync
+func (b *loggerBuilder) SyncWrite(syncWrite bool) *loggerBuilder {
+	b.config.SyncWrite = syncWrite
+	return b
+}
+
+func (b *loggerBuilder) SyncMode(syncMode bool) *loggerBuilder {
+	b.config.SyncMode = syncMode
 	return b
 }
 

@@ -47,6 +47,8 @@ type LoggerConfig struct {
 	// Wheather 'sync' data to file after each log write,
 	// that make sure logs can not be lost.
 	SyncWrite bool
+	// Wheather log 'Emit' and 'Hanle' are synchronous.
+	SyncMode bool
 }
 
 func ConfigLogger(name string, config *LoggerConfig) error {
@@ -144,6 +146,8 @@ func createHandler(config *LoggerConfig) (Handler, error) {
 		handler = h
 		h.FileHandler.SyncWrite(config.SyncWrite)
 	}
+
+	handler.SetSyncMode(config.SyncMode)
 
 	return handler, nil
 }
