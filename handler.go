@@ -144,9 +144,9 @@ func (handler *StreamHandler) SetOutput(out io.Writer) {
 // derived from StreamHandler.
 type FileHandler struct {
 	StreamHandler
-	fileName string
-	file     *os.File
-	syncLog  bool
+	fileName    string
+	file        *os.File
+	isSyncWrite bool
 }
 
 func NewFileHandler(fileName string) (*FileHandler, error) {
@@ -156,9 +156,17 @@ func NewFileHandler(fileName string) (*FileHandler, error) {
 	}
 
 	streamHandler := NewStreamHandle(file)
-	handler := &FileHandler{StreamHandler: *streamHandler, fileName: fileName, file: file}
+	handler := &FileHandler{
+		StreamHandler: *streamHandler,
+		fileName:      fileName,
+		file:          file,
+	}
 
 	return handler, nil
+}
+
+func (handler *FileHandler) SyncWrite(isSync bool) {
+	handler.isSyncWrite = isSync
 }
 
 func (handler *FileHandler) Handle(msg *_Msg) error {
@@ -166,7 +174,7 @@ func (handler *FileHandler) Handle(msg *_Msg) error {
 		return err
 	}
 
-	if handler.syncLog {
+	if handler.isSyncWrite {
 		if err := handler.file.Sync(); err != nil {
 			return err
 		}
@@ -344,7 +352,7 @@ func (handler *SizeRotateFileHandler) Handle(msg *_Msg) error {
 		return errors.New("failed to Write logMsg")
 	}
 
-	if handler.syncLog {
+	if handler.isSyncWrite {
 		if err := handler.file.Sync(); err != nil {
 			return err
 		}
