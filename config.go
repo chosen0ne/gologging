@@ -44,21 +44,9 @@ type LoggerConfig struct {
 	FileName         string
 	EnableConsoleLog bool
 	LogPath          string
-}
-
-func defaultValIfNonExist(config *LoggerConfig) {
-	if config.Format == "" {
-		config.Format = defautlFormatStr
-	}
-	if config.Interval == 0 {
-		config.Interval = DAY
-	}
-	if config.BackupCount == 0 {
-		config.BackupCount = 10
-	}
-	if config.MaxBytes == 0 {
-		config.MaxBytes = 100 * MB
-	}
+	// Wheather 'sync' data to file after each log write,
+	// that make sure logs can not be lost.
+	SyncWrite bool
 }
 
 func ConfigLogger(name string, config *LoggerConfig) error {
@@ -66,7 +54,7 @@ func ConfigLogger(name string, config *LoggerConfig) error {
 		return errors.New("not support handler: " + string(config.Handler))
 	}
 
-	defaultValIfNonExist(config)
+	setDefaultConfig(name, config)
 
 	loggerMgr.mu.Lock()
 	defer loggerMgr.mu.Unlock()
@@ -76,36 +64,7 @@ func ConfigLogger(name string, config *LoggerConfig) error {
 		return errors.New("logger named '" + name + "' already exists!")
 	}
 
-	if config.Handler != CONSOLE_HANDLER && config.FileName == "" {
-		config.FileName = name
-	}
-
-	if !strings.HasSuffix(config.FileName, ".log") {
-		config.FileName += ".log"
-	}
-
-	if config.LogPath == "" {
-		config.LogPath = "."
-	}
-
-	var err error
-	fpath, err := getAbsPath(config.LogPath, config.FileName)
-	if err != nil {
-		return err
-	}
-
-	// Create Handler
-	var handler Handler
-	switch config.Handler {
-	case CONSOLE_HANDLER:
-		handler = defaultConsoleHandler()
-		config.EnableConsoleLog = false
-	case TIME_ROTATE_HANDLER:
-		handler, err = NewTimeRotateFileHandler(fpath, config.Interval, config.BackupCount)
-	case SIZE_ROTATE_HANDLER:
-		handler, err = NewSizeRotateFileHandler(fpath, config.MaxBytes, config.BackupCount)
-	}
-
+	handler, err := createHandler(config)
 	if err != nil {
 		return err
 	}
@@ -131,6 +90,62 @@ func ConfigLogger(name string, config *LoggerConfig) error {
 	logger.AddHandler(handler)
 
 	return nil
+}
+
+func setDefaultConfig(name string, config *LoggerConfig) {
+	if config.Format == "" {
+		config.Format = defautlFormatStr
+	}
+	if config.Interval == 0 {
+		config.Interval = DAY
+	}
+	if config.BackupCount == 0 {
+		config.BackupCount = 10
+	}
+	if config.MaxBytes == 0 {
+		config.MaxBytes = 100 * MB
+	}
+	if config.Handler != CONSOLE_HANDLER && config.FileName == "" {
+		config.FileName = name
+	}
+	if !strings.HasSuffix(config.FileName, ".log") {
+		config.FileName += ".log"
+	}
+	if config.LogPath == "" {
+		config.LogPath = "."
+	}
+}
+
+func createHandler(config *LoggerConfig) (Handler, error) {
+	fpath, err := getAbsPath(config.LogPath, config.FileName)
+	if err != nil {
+		return nil, err
+	}
+
+	var handler Handler
+	switch config.Handler {
+	case CONSOLE_HANDLER:
+		handler = defaultConsoleHandler()
+		config.EnableConsoleLog = false
+
+	case TIME_ROTATE_HANDLER:
+		h, err := NewTimeRotateFileHandler(fpath, config.Interval, config.BackupCount)
+		if err != nil {
+			return nil, err
+		}
+		handler = h
+		h.FileHandler.SyncWrite(config.SyncWrite)
+
+	case SIZE_ROTATE_HANDLER:
+		h, err := NewSizeRotateFileHandler(fpath, config.MaxBytes, config.BackupCount)
+		if err != nil {
+			return nil, err
+		}
+		handler = h
+		h.FileHandler.SyncWrite(config.SyncWrite)
+	}
+
+	return handler, nil
 }
 
 func getAbsPath(fpath, fname string) (string, error) {
