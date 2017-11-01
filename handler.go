@@ -40,12 +40,17 @@ type _Msg struct {
 	lineNo     int
 }
 
+// Interface to handle each log message.
 type Handler interface {
 	Handle(msg *_Msg) error
 	SetFormatter(formatter *Formatter)
 	SetLevel(level Level)
 }
 
+// As some handlers need to do some high-cost things when
+// log is emitted, such as file rotation. So we made handlers
+// run in a goroutine that process things asynchronously,
+// which can not affect the main goroutine.
 type HandlerLoop struct {
 	q       chan *_Msg
 	handler Handler
@@ -95,6 +100,7 @@ func (loop *HandlerLoop) isExternalFunc(funcName string) bool {
 	return !ok
 }
 
+// A log handler used to emit message to stream.
 type StreamHandler struct {
 	output    io.Writer
 	formatter *Formatter
@@ -134,6 +140,8 @@ func (handler *StreamHandler) SetOutput(out io.Writer) {
 	handler.output = out
 }
 
+// A log handler which emits message to a file, and it's
+// derived from StreamHandler.
 type FileHandler struct {
 	StreamHandler
 	fileName string
@@ -167,6 +175,7 @@ func (handler *FileHandler) Handle(msg *_Msg) error {
 	return nil
 }
 
+// Time interval of file rotates.
 type RotateInterval uint32
 
 const (
@@ -176,6 +185,7 @@ const (
 	HALF_HOUR RotateInterval = 1800
 )
 
+// A file handler which supports rotation by time interval.
 type TimeRotateFileHandler struct {
 	FileHandler
 	interval    RotateInterval
@@ -269,6 +279,7 @@ const (
 	GB int64 = 1 << (10 * iota)
 )
 
+// A file handler which supports rotation by file size.
 type SizeRotateFileHandler struct {
 	FileHandler
 	maxBytes    int64

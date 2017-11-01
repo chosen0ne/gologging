@@ -45,6 +45,18 @@ type Formatter struct {
 	valFunc   []interface{}
 }
 
+// New a Formatter to specify the log format.
+// Attributes supported as follows:
+//	${date}: '2006-10-11'
+//	${time}: '15:01:21'
+//	${datetime}: '2006-10-11 15:01:21'
+//	${funcname}: 'logging.(*Formatter).Format'
+//	${filename}: 'formatter.go'. The name of the file include the invokation
+//				 of Logger.Log()
+//	${filepath}: The fullpath of the file.
+//	${lineno}: The line number of the invokation in the file.
+//	${levelname}: The level of the log.
+//	${message}: The message to log
 func NewFormatter(formatStr string) (*Formatter, error) {
 	valFuncs, fmtStr, err := parseFmtStr(formatStr)
 	if err != nil {

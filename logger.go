@@ -51,6 +51,8 @@ type Logger struct {
 	name  string
 	// Handlers will decide how to process the log message.
 	// And a logger can be configure with multiple handlers.
+	//
+	// TODO: support sync mode to handle message
 	handlers []*HandlerLoop
 	mu       sync.Mutex
 }

@@ -76,8 +76,7 @@ func ConfigLogger(name string, config *LoggerConfig) error {
 		return errors.New("logger named '" + name + "' already exists!")
 	}
 
-	if config.Handler != CONSOLE_HANDLER &&
-		config.FileName == "" {
+	if config.Handler != CONSOLE_HANDLER && config.FileName == "" {
 		config.FileName = name
 	}
 
