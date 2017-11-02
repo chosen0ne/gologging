@@ -53,11 +53,11 @@ type Logger struct {
 	// And a logger can be configure with multiple handlers.
 	//
 	// TODO: support sync mode to handle message
-	handlers []*HandlerLoop
+	handlers []*handlerLoop
 }
 
 func newLogger(name string, enableConsoleLog bool) *Logger {
-	handlers := make([]*HandlerLoop, 0)
+	handlers := make([]*handlerLoop, 0)
 	// Default logger level is INFO
 	logger := &Logger{level: INFO, name: name, handlers: handlers}
 	if enableConsoleLog {

@@ -53,18 +53,18 @@ type Handler interface {
 // log is emitted, such as file rotation. So we made handlers
 // run in a goroutine that process things asynchronously,
 // which can not affect the main goroutine.
-type HandlerLoop struct {
+type handlerLoop struct {
 	q       chan *_Msg
 	handler Handler
 	w       chan byte // used to make sure 'Emit' and 'Handle' are synchronous.
 }
 
-func NewLoop(size int, handler Handler) *HandlerLoop {
+func NewLoop(size int, handler Handler) *handlerLoop {
 	q := make(chan *_Msg, size)
-	return &HandlerLoop{q, handler, make(chan byte)}
+	return &handlerLoop{q, handler, make(chan byte)}
 }
 
-func (loop *HandlerLoop) HandleLoop() {
+func (loop *handlerLoop) HandleLoop() {
 	for {
 		msg := <-loop.q
 
@@ -79,7 +79,7 @@ func (loop *HandlerLoop) HandleLoop() {
 	}
 }
 
-func (loop *HandlerLoop) Emit(msg *_Msg) {
+func (loop *handlerLoop) Emit(msg *_Msg) {
 	stacks := make([]uintptr, _CALLER_SIZE)
 	n := runtime.Callers(_CALLER_SKIP, stacks)
 
@@ -102,7 +102,7 @@ func (loop *HandlerLoop) Emit(msg *_Msg) {
 	}
 }
 
-func (loop *HandlerLoop) isExternalFunc(funcName string) bool {
+func (loop *handlerLoop) isExternalFunc(funcName string) bool {
 	parts := strings.Split(funcName, "/")
 	if len(parts) <= 0 {
 		return false
