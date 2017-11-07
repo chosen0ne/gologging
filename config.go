@@ -51,6 +51,22 @@ type LoggerConfig struct {
 	SyncMode bool
 }
 
+func newLoggerConfig(conf *LoggerConfig) *LoggerConfig {
+	loggerConf := &LoggerConfig{}
+	loggerConf.LevelVal = conf.LevelVal
+	loggerConf.Format = conf.Format
+	loggerConf.Handler = conf.Handler
+	loggerConf.Interval = conf.Interval
+	loggerConf.BackupCount = conf.BackupCount
+	loggerConf.MaxBytes = conf.MaxBytes
+	loggerConf.FileName = conf.FileName
+	loggerConf.EnableConsoleLog = conf.EnableConsoleLog
+	loggerConf.LogPath = conf.LogPath
+	loggerConf.SyncMode = conf.SyncMode
+
+	return loggerConf
+}
+
 func ConfigLogger(name string, config *LoggerConfig) error {
 	if !validHandlerType(config.Handler) {
 		return errors.New("not support handler: " + string(config.Handler))
@@ -70,17 +86,6 @@ func ConfigLogger(name string, config *LoggerConfig) error {
 	if err != nil {
 		return err
 	}
-
-	// Create Formatter
-	if config.Format == "" {
-		config.Format = defautlFormatStr
-	}
-
-	formatter, err := NewFormatter(config.Format)
-	if err != nil {
-		return err
-	}
-	handler.SetFormatter(formatter)
 
 	// Create Logger
 	logger, ok := loggerMgr.logCache[name]
@@ -127,7 +132,7 @@ func createHandler(config *LoggerConfig) (Handler, error) {
 	var handler Handler
 	switch config.Handler {
 	case CONSOLE_HANDLER:
-		handler = defaultConsoleHandler()
+		handler = NewStreamHandle(os.Stdout)
 		config.EnableConsoleLog = false
 
 	case TIME_ROTATE_HANDLER:
@@ -147,7 +152,23 @@ func createHandler(config *LoggerConfig) (Handler, error) {
 		h.FileHandler.SyncWrite(config.SyncWrite)
 	}
 
+	handler.SetLevel(config.LevelVal)
 	handler.SetSyncMode(config.SyncMode)
+	if config.Handler == CONSOLE_HANDLER {
+		// By default, console handler is in synchronized mode.
+		handler.SetSyncMode(true)
+	}
+
+	// Create Formatter
+	if config.Format == "" {
+		config.Format = defautlFormatStr
+	}
+
+	formatter, err := NewFormatter(config.Format)
+	if err != nil {
+		return nil, err
+	}
+	handler.SetFormatter(formatter)
 
 	return handler, nil
 }

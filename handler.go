@@ -162,6 +162,14 @@ func (handler *StreamHandler) SetOutput(out io.Writer) {
 	handler.output = out
 }
 
+func (handler *StreamHandler) String() string {
+	var b bytes.Buffer
+
+	fmt.Fprintf(&b, "StreamHandler{level: %s, isSync: %t}", handler.level.Name(), handler.isSync)
+
+	return string(b.Bytes())
+}
+
 // A log handler which emits message to a file, and it's
 // derived from StreamHandler.
 type FileHandler struct {
@@ -203,6 +211,15 @@ func (handler *FileHandler) Handle(msg *_Msg) error {
 	}
 
 	return nil
+}
+
+func (handler *FileHandler) String() string {
+	var b bytes.Buffer
+
+	fmt.Fprintf(&b, "FileHandler{StreamHandler: %s, fname: %s, syncWrite: %t}",
+		handler.StreamHandler.String(), handler.fileName, handler.isSyncWrite)
+
+	return string(b.Bytes())
 }
 
 // Time interval of file rotates.
@@ -300,6 +317,15 @@ func (handler *TimeRotateFileHandler) doRotate() error {
 	handler.SetOutput(file)
 
 	return nil
+}
+
+func (handler *TimeRotateFileHandler) String() string {
+	var b bytes.Buffer
+
+	fmt.Fprintf(&b, "TimeRotateFileHandler{FileHandler: %s, interval: %d, backupCount: %d}",
+		handler.FileHandler.String(), handler.interval, handler.backupCount)
+
+	return string(b.Bytes())
 }
 
 const (
@@ -438,6 +464,15 @@ func (handler *SizeRotateFileHandler) doRotate() error {
 	handler.SetOutput(file)
 
 	return nil
+}
+
+func (handler *SizeRotateFileHandler) String() string {
+	var b bytes.Buffer
+
+	fmt.Fprintf(&b, "SizeRotateFileHandler{FileHandler: %s, maxBytes: %d, backupCount: %d}",
+		handler.FileHandler.String(), handler.maxBytes, handler.backupCount)
+
+	return string(b.Bytes())
 }
 
 func findMaxSuffix(fileName string) (int32, error) {

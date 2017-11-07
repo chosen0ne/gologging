@@ -10,6 +10,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"github.com/chosen0ne/goutils"
 	"os"
 	"sync"
 )
@@ -86,6 +87,19 @@ func (logger *Logger) log(level Level, fmtStr string, vals ...interface{}) {
 	}
 }
 
+func (logger *Logger) debugInfo() string {
+	b := &bytes.Buffer{}
+
+	fmt.Fprintf(b, "name: %s\n", logger.name)
+	fmt.Fprintf(b, "level: %s\n", logger.level.Name())
+	fmt.Fprintln(b, "handlers:")
+	for _, h := range logger.handlers {
+		fmt.Fprintln(b, h.handler)
+	}
+
+	return string(b.Bytes())
+}
+
 func (logger *Logger) SetLevel(level Level) {
 	if !checkLevel(level) {
 		panic(errors.New("not support level"))
@@ -151,6 +165,19 @@ func (mgr *_LogMgr) getLogger(name string, enableConsoleLog bool) *Logger {
 	}
 
 	return logger
+}
+
+func (mgr *_LogMgr) AddLogger(name string, logger *Logger) error {
+	mgr.mu.Lock()
+	defer mgr.mu.Unlock()
+
+	if _, ok := mgr.logCache[name]; !ok {
+		mgr.logCache[name] = logger
+	} else {
+		return goutils.NewErr("logger named '%s' already exists", name)
+	}
+
+	return nil
 }
 
 // Methods for root logger, all the message emit by root logger
