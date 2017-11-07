@@ -7,7 +7,6 @@
 package gologging
 
 import (
-	"fmt"
 	"testing"
 )
 

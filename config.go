@@ -8,6 +8,7 @@ package gologging
 
 import (
 	"errors"
+	"github.com/chosen0ne/goutils"
 	"os"
 	"path"
 	"strings"
@@ -84,7 +85,7 @@ func ConfigLogger(name string, config *LoggerConfig) error {
 
 	handler, err := createHandler(config)
 	if err != nil {
-		return err
+		return goutils.WrapErrorf(err, "failed to create handler for logger, name: %s", name)
 	}
 
 	// Create Logger
@@ -126,7 +127,7 @@ func setDefaultConfig(name string, config *LoggerConfig) {
 func createHandler(config *LoggerConfig) (Handler, error) {
 	fpath, err := getAbsPath(config.LogPath, config.FileName)
 	if err != nil {
-		return nil, err
+		return nil, goutils.WrapErrorf(err, "failed to get absolute path")
 	}
 
 	var handler Handler
@@ -138,7 +139,7 @@ func createHandler(config *LoggerConfig) (Handler, error) {
 	case TIME_ROTATE_HANDLER:
 		h, err := NewTimeRotateFileHandler(fpath, config.Interval, config.BackupCount)
 		if err != nil {
-			return nil, err
+			return nil, goutils.WrapErrorf(err, "failed to create time rotate handler")
 		}
 		handler = h
 		h.FileHandler.SyncWrite(config.SyncWrite)
@@ -146,7 +147,7 @@ func createHandler(config *LoggerConfig) (Handler, error) {
 	case SIZE_ROTATE_HANDLER:
 		h, err := NewSizeRotateFileHandler(fpath, config.MaxBytes, config.BackupCount)
 		if err != nil {
-			return nil, err
+			return nil, goutils.WrapErrorf(err, "failed to create size rotate handler")
 		}
 		handler = h
 		h.FileHandler.SyncWrite(config.SyncWrite)
@@ -166,7 +167,7 @@ func createHandler(config *LoggerConfig) (Handler, error) {
 
 	formatter, err := NewFormatter(config.Format)
 	if err != nil {
-		return nil, err
+		return nil, goutils.WrapErrorf(err, "failed to create formatter")
 	}
 	handler.SetFormatter(formatter)
 
@@ -180,7 +181,8 @@ func getAbsPath(fpath, fname string) (string, error) {
 
 	dir, err := os.Getwd()
 	if err != nil {
-		return "", err
+		return "", goutils.WrapErrorf(err, "failed to get cwd, path: %s, name: %s",
+			fpath, fname)
 	}
 
 	return path.Join(path.Join(dir, fpath), fname), nil

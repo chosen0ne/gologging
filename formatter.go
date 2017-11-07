@@ -9,6 +9,7 @@ package gologging
 import (
 	"bytes"
 	"fmt"
+	"github.com/chosen0ne/goutils"
 	"io"
 	"path"
 	"strconv"
@@ -60,7 +61,7 @@ type Formatter struct {
 func NewFormatter(formatStr string) (*Formatter, error) {
 	valFuncs, fmtStr, err := parseFmtStr(formatStr)
 	if err != nil {
-		return nil, err
+		return nil, goutils.WrapErrorf(err, "failed to parse formate string, str: %s", formatStr)
 	}
 
 	formatter := &Formatter{fmtStr, valFuncs}

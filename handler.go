@@ -10,6 +10,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"github.com/chosen0ne/goutils"
 	"io"
 	"os"
 	"path/filepath"
@@ -182,7 +183,7 @@ type FileHandler struct {
 func NewFileHandler(fileName string) (*FileHandler, error) {
 	file, err := os.OpenFile(fileName, _OPEN_FILE_FLAG, _OPEN_FILE_MODE)
 	if err != nil {
-		return nil, err
+		return nil, goutils.WrapErrorf(err, "failed to open file, file: %s", fileName)
 	}
 
 	streamHandler := NewStreamHandle(file)
@@ -201,12 +202,12 @@ func (handler *FileHandler) SyncWrite(isSync bool) {
 
 func (handler *FileHandler) Handle(msg *_Msg) error {
 	if err := handler.StreamHandler.Handle(msg); err != nil {
-		return err
+		return goutils.WrapErrorf(err, "failed to handle")
 	}
 
 	if handler.isSyncWrite {
 		if err := handler.file.Sync(); err != nil {
-			return err
+			return goutils.WrapErrorf(err, "failed to sync")
 		}
 	}
 
@@ -247,7 +248,7 @@ func NewTimeRotateFileHandler(
 
 	fileHandler, err := NewFileHandler(fileName)
 	if err != nil {
-		return nil, err
+		return nil, goutils.WrapErrorf(err, "failed to new file handler, file: %s", fileName)
 	}
 
 	rotateHandler := &TimeRotateFileHandler{
@@ -262,7 +263,7 @@ func (handler *TimeRotateFileHandler) Handle(msg *_Msg) error {
 	// Rotate file
 	if handler.shouldRotate() {
 		if err := handler.doRotate(); err != nil {
-			return err
+			return goutils.WrapErrorf(err, "failed to rotate")
 		}
 	}
 
@@ -287,13 +288,13 @@ func (handler *TimeRotateFileHandler) shouldRotate() bool {
 func (handler *TimeRotateFileHandler) doRotate() error {
 	err := handler.file.Close()
 	if err != nil {
-		return err
+		return goutils.WrapErrorf(err, "failed to close")
 	}
 
 	// Make sure there are 'backupCount' logs at most
 	files, err := filepath.Glob(handler.fileName + "_*")
 	if err != nil {
-		return err
+		return goutils.WrapErrorf(err, "failed to glob, file: %s", handler.fileName)
 	}
 
 	if len(files) >= int(handler.backupCount) {
@@ -301,7 +302,7 @@ func (handler *TimeRotateFileHandler) doRotate() error {
 		// NOTICE: code below depends on the files order of filepath.Glob
 		for i := 0; i < rmCount; i++ {
 			if err := os.Remove(files[i]); err != nil {
-				return err
+				return goutils.WrapErrorf(err, "failed to remove file, file: %s", files[i])
 			}
 		}
 	}
@@ -311,7 +312,7 @@ func (handler *TimeRotateFileHandler) doRotate() error {
 	err = os.Rename(handler.fileName, handler.fileName+"_"+suffix)
 	file, err := os.OpenFile(handler.fileName, _OPEN_FILE_FLAG, _OPEN_FILE_MODE)
 	if err != nil {
-		return err
+		return goutils.WrapErrorf(err, "failed to open file, file: %s", handler.fileName)
 	}
 	handler.file = file
 	handler.SetOutput(file)
@@ -350,19 +351,19 @@ func NewSizeRotateFileHandler(
 	backupCount uint16) (*SizeRotateFileHandler, error) {
 	fileHandler, err := NewFileHandler(fileName)
 	if err != nil {
-		return nil, err
+		return nil, goutils.WrapErrorf(err, "failed to create file handler, file: %s", fileName)
 	}
 
 	// Fetch bytes for current log
 	curBytes, err := fileHandler.file.Seek(0, 2)
 	if err != nil {
-		return nil, err
+		return nil, goutils.WrapErrorf(err, "failed to seek, file: %s", fileName)
 	}
 
 	// Fetch max log suffix
 	suffix, err := findMaxSuffix(fileName)
 	if err != nil {
-		return nil, err
+		return nil, goutils.WrapErrorf(err, "failed to find max suffix, file: %s", fileName)
 	}
 
 	rotateHandler := &SizeRotateFileHandler{
@@ -389,7 +390,7 @@ func (handler *SizeRotateFileHandler) Handle(msg *_Msg) error {
 	// Need to rotate
 	if handler.curBytes > handler.maxBytes {
 		if err := handler.doRotate(); err != nil {
-			return err
+			return goutils.WrapErrorf(err, "failed to rotate")
 		}
 
 		handler.curBytes = int64(len(logMsg))
@@ -402,7 +403,7 @@ func (handler *SizeRotateFileHandler) Handle(msg *_Msg) error {
 
 	if handler.isSyncWrite {
 		if err := handler.file.Sync(); err != nil {
-			return err
+			return goutils.WrapErrorf(err, "failed to sync file")
 		}
 	}
 
@@ -411,12 +412,12 @@ func (handler *SizeRotateFileHandler) Handle(msg *_Msg) error {
 
 func (handler *SizeRotateFileHandler) doRotate() error {
 	if err := handler.file.Close(); err != nil {
-		return err
+		return goutils.WrapErrorf(err, "failed to close file")
 	}
 
 	maxSuffix, err := findMaxSuffix(handler.fileName)
 	if err != nil {
-		return err
+		return goutils.WrapErrorf(err, "failed to find max suffix, file: %s", handler.fileName)
 	}
 
 	nameBuf := bytes.Buffer{}
@@ -436,12 +437,13 @@ func (handler *SizeRotateFileHandler) doRotate() error {
 
 			if _, err := os.Stat(dfnStr); err == nil {
 				if err := os.Remove(dfnStr); err != nil {
-					return err
+					return goutils.WrapErrorf(err, "failed to remove file, file: %s", dfnStr)
 				}
 			}
 
 			if err := os.Rename(sfnStr, dfnStr); err != nil {
-				return err
+				return goutils.WrapErrorf(err, "failed to rename file, src: %s, dist: %s",
+					sfnStr, dfnStr)
 			}
 		}
 
@@ -452,12 +454,12 @@ func (handler *SizeRotateFileHandler) doRotate() error {
 	}
 
 	if err := os.Rename(handler.fileName, string(nameBuf.Bytes())); err != nil {
-		return err
+		return goutils.WrapErrorf(err, "failed rename file")
 	}
 
 	file, err := os.OpenFile(handler.fileName, _OPEN_FILE_FLAG, _OPEN_FILE_MODE)
 	if err != nil {
-		return err
+		return goutils.WrapErrorf(err, "failed to open file, file: %s", handler.fileName)
 	}
 
 	handler.file = file
@@ -479,7 +481,7 @@ func findMaxSuffix(fileName string) (int32, error) {
 	var maxSuffix int32 = 0
 	files, err := filepath.Glob(fileName + "_*")
 	if err != nil {
-		return maxSuffix, err
+		return maxSuffix, goutils.WrapErrorf(err, "failed to glob, file: %s", fileName)
 	}
 
 	for _, f := range files {
@@ -490,7 +492,7 @@ func findMaxSuffix(fileName string) (int32, error) {
 
 		idx, err := strconv.Atoi(f[sepIdx+1:])
 		if err != nil {
-			return maxSuffix, err
+			return maxSuffix, goutils.WrapErrorf(err, "failed to str to int, str: %s", f[sepIdx+1:])
 		}
 
 		if maxSuffix < int32(idx) {
