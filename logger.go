@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"github.com/chosen0ne/goutils"
 	"os"
+	"strings"
 	"sync"
 )
 
@@ -38,6 +39,18 @@ var lvNames = []string{
 }
 
 type Level int8
+
+func NewLevelString(lvString string) Level {
+	for idx, lvName := range lvNames {
+		if lvName != strings.ToUpper(lvString) {
+			continue
+		}
+
+		return Level(idx)
+	}
+
+	return _MAX_LEVEL
+}
 
 func (level Level) Name() string {
 	if checkLevel(level) {

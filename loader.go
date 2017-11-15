@@ -94,7 +94,7 @@ func loadLogger(loggerName string, conf *goconf.Conf, ctx context) error {
 		if lvStr, err := conf.GetString(_LEVEL_LABEL); err != nil {
 			return goutils.WrapErrorf(err, "failed to get level config")
 		} else {
-			if level = toLevel(lvStr); level == _MAX_LEVEL {
+			if level = NewLevelString(lvStr); level == _MAX_LEVEL {
 				return goutils.NewErr("Unkown logger level, level: %s", lvStr)
 			}
 		}
@@ -297,18 +297,6 @@ func loadFormatter(fmtName string, conf *goconf.Conf, ctx context) (string, erro
 
 		return fmtStr, nil
 	}
-}
-
-func toLevel(lvStr string) Level {
-	for idx, lvName := range lvNames {
-		if lvName != strings.ToUpper(lvStr) {
-			continue
-		}
-
-		return Level(idx)
-	}
-
-	return _MAX_LEVEL
 }
 
 func parseInterval(conf *goconf.Conf) (RotateInterval, error) {
