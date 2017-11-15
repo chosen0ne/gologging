@@ -94,7 +94,7 @@ func loadLogger(loggerName string, conf *goconf.Conf, ctx context) error {
 		if lvStr, err := conf.GetString(_LEVEL_LABEL); err != nil {
 			return goutils.WrapErrorf(err, "failed to get level config")
 		} else {
-			if level = NewLevelString(lvStr); level == _MAX_LEVEL {
+			if level = NewLevelString(lvStr); !level.IsValid() {
 				return goutils.NewErr("Unkown logger level, level: %s", lvStr)
 			}
 		}

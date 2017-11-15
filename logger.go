@@ -60,6 +60,10 @@ func (level Level) Name() string {
 	return "UNKOWN_LEVEL"
 }
 
+func (level Level) IsValid() bool {
+	return level >= DEBUG && level < _MAX_LEVEL
+}
+
 type Logger struct {
 	level Level
 	name  string
