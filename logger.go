@@ -18,6 +18,7 @@ import (
 
 const (
 	DEBUG = iota
+	TRACK
 	INFO
 	WARN
 	ERROR
@@ -32,6 +33,7 @@ var (
 
 var lvNames = []string{
 	"DEBUG",
+	"TRACK",
 	"INFO",
 	"WARN",
 	"ERROR",
@@ -135,6 +137,10 @@ func (logger *Logger) Debug(fmt string, vals ...interface{}) {
 	logger.log(DEBUG, fmt, vals...)
 }
 
+func (logger *Logger) Track(fmt string, vals ...interface{}) {
+	logger.log(TRACK, fmt, vals...)
+}
+
 func (logger *Logger) Info(fmt string, vals ...interface{}) {
 	logger.log(INFO, fmt, vals...)
 }
@@ -201,6 +207,10 @@ func (mgr *_LogMgr) AddLogger(name string, logger *Logger) error {
 // wil be output to stdout
 func Debug(fmt string, vals ...interface{}) {
 	loggerMgr.rootLogger.Debug(fmt, vals...)
+}
+
+func Track(fmt string, vals ...interface{}) {
+	loggerMgr.rootLogger.Track(fmt, vals...)
 }
 
 func Info(fmt string, vals ...interface{}) {
