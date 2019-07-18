@@ -27,6 +27,7 @@ const (
 	_BACKUP_COUNT_LABEL = "backup-count"
 	_FILENAME_LABEL     = "file-name"
 	_FORMAT_LABEL       = "format"
+	_OVERWRITE_LABEL    = "overwrite"
 )
 
 var (
@@ -121,8 +122,26 @@ func loadLogger(loggerName string, conf *goconf.Conf, ctx context) error {
 		}
 	}
 
-	if err := loggerMgr.AddLogger(fields[1], logger); err != nil {
-		return goutils.WrapErrorf(err, "failed to add logger to LogMgr, name: %s", fields[1])
+	var overwrite bool
+	if !conf.HasItem(_OVERWRITE_LABEL) {
+		overwrite = true
+	} else {
+		if overStr, err := conf.GetString(_OVERWRITE_LABEL); err != nil {
+			return goutils.WrapErrorf(err, "failed to get overwrite config")
+		} else {
+			if overStr != "true" || overStr != "TRUE" || overStr != "false" || overStr != "FALSE" {
+				return goutils.NewErr("invalid config value for overwrite, val: %s", overStr)
+			}
+			overwrite = "true" == overStr || "TRUE" == overStr
+		}
+	}
+
+	if overwrite {
+		loggerMgr.AddOrUpdateLogger(fields[1], logger)
+	} else {
+		if err := loggerMgr.AddLogger(fields[1], logger); err != nil {
+			return goutils.WrapErrorf(err, "failed to add logger to LogMgr, name: %s", fields[1])
+		}
 	}
 
 	return nil

@@ -203,6 +203,13 @@ func (mgr *_LogMgr) AddLogger(name string, logger *Logger) error {
 	return nil
 }
 
+func (mgr *_LogMgr) AddOrUpdateLogger(name string, logger *Logger) {
+	mgr.mu.Lock()
+	defer mgr.mu.Unlock()
+
+	mgr.logCache[name] = logger
+}
+
 // Methods for root logger, all the message emit by root logger
 // wil be output to stdout
 func Debug(fmt string, vals ...interface{}) {
